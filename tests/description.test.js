@@ -159,3 +159,55 @@ describe('详情富文本 - ProductSpec 组件 UI 结构', () => {
     expect(wrapper.find('.description-content').exists()).toBe(true)
   })
 })
+
+describe('详情富文本 - 分区导航 Tab', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('渲染 4 个分区导航 Tab', () => {
+    const wrapper = mount(ProductDescription, {
+      props: { productId: 1001, initialHtml: '<p>x</p>' }
+    })
+    const tabs = wrapper.findAll('.detail-tab')
+    expect(tabs).toHaveLength(4)
+    expect(tabs[0].text()).toBe('产品参数')
+    expect(tabs[1].text()).toBe('功能介绍')
+    expect(tabs[2].text()).toBe('场景案例')
+    expect(tabs[3].text()).toBe('售后保障')
+  })
+
+  it('expose detailSections 配置包含 4 个分区', () => {
+    const wrapper = mount(ProductDescription, {
+      props: { productId: 1001, initialHtml: '<p>x</p>' }
+    })
+    expect(wrapper.vm.detailSections).toHaveLength(4)
+    expect(wrapper.vm.detailSections[0]).toEqual({ id: 'section-params', label: '产品参数' })
+  })
+
+  it('默认激活第一个分区', () => {
+    const wrapper = mount(ProductDescription, {
+      props: { productId: 1001, initialHtml: '<p>x</p>' }
+    })
+    expect(wrapper.vm.activeSection).toBe('section-params')
+    expect(wrapper.findAll('.detail-tab')[0].classes()).toContain('is-active')
+  })
+
+  it('点击 Tab 切换 activeSection', async () => {
+    const wrapper = mount(ProductDescription, {
+      props: { productId: 1001, initialHtml: '<p>内容</p>' }
+    })
+    await wrapper.findAll('.detail-tab')[2].trigger('click')
+    expect(wrapper.vm.activeSection).toBe('section-cases')
+    expect(wrapper.findAll('.detail-tab')[2].classes()).toContain('is-active')
+    expect(wrapper.findAll('.detail-tab')[0].classes()).not.toContain('is-active')
+  })
+
+  it('scrollToSection 缺失目标元素时仅更新激活态不抛错', () => {
+    const wrapper = mount(ProductDescription, {
+      props: { productId: 1001, initialHtml: '<p>无分区内容</p>' }
+    })
+    expect(() => wrapper.vm.scrollToSection('section-service')).not.toThrow()
+    expect(wrapper.vm.activeSection).toBe('section-service')
+  })
+})
