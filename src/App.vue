@@ -54,6 +54,12 @@
       @price-change="onPriceChange"
     />
 
+    <ProductDescription
+      v-if="dataLoaded"
+      :product-id="product.id"
+      :initial-html="product.description"
+    />
+
     <footer class="buy-bar">
       <div class="bar-left">
         <button class="icon-btn">
@@ -93,7 +99,8 @@
 import { ref, computed, onMounted } from 'vue'
 import ProductMedia from './components/ProductMedia.vue'
 import ProductSpec from './components/ProductSpec.vue'
-import { getProductDetail, getProductSales, createOrder } from './api'
+import ProductDescription from './components/ProductDescription.vue'
+import { getProductDetail, getProductSales, createOrder, stripHtmlTags } from './api'
 
 const PRODUCT_ID = 1001
 
@@ -113,7 +120,8 @@ const product = ref({
   subtitle: '',
   rating: 0,
   images: [],
-  video: ''
+  video: '',
+  description: ''
 })
 
 const salesInfo = ref({
@@ -146,7 +154,8 @@ const fetchProductDetail = async () => {
       subtitle: data.subtitle,
       rating: data.rating,
       images: data.images,
-      video: data.video
+      video: data.video,
+      description: data.description
     }
     specGroups.value = data.specGroups
     currentUnitPrice.value = data.price

@@ -78,6 +78,23 @@ const mockProduct = {
   discount: '限时6.9折',
   sales: 128000,
   rating: 4.9,
+  description: `<h2>商品详情</h2>
+<p>这款<strong>主动降噪无线蓝牙耳机</strong>采用最新一代降噪技术，为您带来沉浸式音乐体验。</p>
+<h3>核心卖点</h3>
+<ul>
+  <li>🎵 <strong>40dB 深度主动降噪</strong> - 隔绝 95% 环境噪音</li>
+  <li>🔋 <strong>40小时超长续航</strong> - 单次充电可使用一周</li>
+  <li>🎧 <strong>Hi-Res 金标认证</strong> - 无损音质，细节丰富</li>
+  <li>📶 <strong>蓝牙 5.3</strong> - 稳定连接，低延迟游戏模式</li>
+</ul>
+<h3>规格参数</h3>
+<table border="1" cellpadding="8" cellspacing="0">
+  <tr><td>驱动单元</td><td>40mm 动圈</td></tr>
+  <tr><td>频响范围</td><td>20Hz - 40kHz</td></tr>
+  <tr><td>阻抗</td><td>32Ω</td></tr>
+  <tr><td>灵敏度</td><td>105dB</td></tr>
+</table>
+<p><em>注：以上数据为实验室测试结果，实际使用可能因环境而异。</em></p>`,
   images: [
     'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20wireless%20headphones%20on%20white%20background%20product%20photography&image_size=square_hd',
     'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=wireless%20headphones%20detail%20shot%20ear%20cups%20close%20up%20product%20photo&image_size=square_hd',
@@ -144,7 +161,20 @@ app.get('/api/product/:id', (req, res) => {
       rating: mockProduct.rating,
       images: mockProduct.images,
       video: mockProduct.video,
-      specGroups: mockProduct.specGroups
+      specGroups: mockProduct.specGroups,
+      description: mockProduct.description
+    }
+  })
+})
+
+app.get('/api/product/:id/description', (req, res) => {
+  res.json({
+    code: 0,
+    message: 'success',
+    data: {
+      productId: mockProduct.id,
+      description: mockProduct.description,
+      plainText: mockProduct.description.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
     }
   })
 })
@@ -225,6 +255,29 @@ app.use((err, req, res, next) => {
   next()
 })
 
-app.listen(PORT, () => {
-  console.log(`上传服务已启动: http://localhost:${PORT}`)
+export const getAppState = () => ({
+  mockProduct,
+  salesCount
 })
+
+export const setAppState = (state) => {
+  if (state.mockProduct) {
+    Object.assign(mockProduct, state.mockProduct)
+    mockProduct.skuList = state.mockProduct.skuList
+  }
+  if (state.salesCount !== undefined) {
+    salesCount = state.salesCount
+  }
+}
+
+export const formatSalesText = (count) => {
+  return count >= 10000 ? (count / 10000).toFixed(1) + '万' : count.toString()
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`上传服务已启动: http://localhost:${PORT}`)
+  })
+}
+
+export default app
