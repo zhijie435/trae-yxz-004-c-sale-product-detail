@@ -10,6 +10,10 @@ venv/
 .trae-codex-analysis/
 TRAE-CN-*-任务跟踪表.xlsx
 TRAE-CN-*-任务跟踪表*.xlsx
+YXZ-CN-*-任务跟踪表.xlsx
+YXZ-CN-*-任务跟踪表*.xlsx
+*任务跟踪表.xlsx
+*任务跟踪表*.xlsx
 .~*.xlsx
 ~$*.xlsx
 *.xlsx.lock
