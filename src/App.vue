@@ -29,7 +29,7 @@
 
     <section class="product-info">
       <div class="price-row">
-        <span class="current-price">¥{{ product.price.toFixed(2) }}</span>
+        <span class="current-price">¥{{ displayPrice.toFixed(2) }}</span>
         <span class="original-price" v-if="product.originalPrice">¥{{ product.originalPrice.toFixed(2) }}</span>
         <span class="discount-tag" v-if="product.discount">{{ product.discount }}</span>
       </div>
@@ -41,6 +41,16 @@
         <span class="rating">{{ product.rating }} 分</span>
       </div>
     </section>
+
+    <ProductSpec
+      ref="specRef"
+      :base-price="product.price"
+      :spec-groups="specGroups"
+      :sku-list="skuList"
+      @spec-change="onSpecChange"
+      @quantity-change="onQuantityChange"
+      @price-change="onPriceChange"
+    />
 
     <footer class="buy-bar">
       <div class="bar-left">
@@ -66,6 +76,10 @@
         </button>
       </div>
       <div class="bar-right">
+        <div class="cart-total">
+          <span class="total-label">合计</span>
+          <span class="total-amount">¥{{ currentTotalPrice.toFixed(2) }}</span>
+        </div>
         <button class="buy-btn buy-btn--cart">加入购物车</button>
         <button class="buy-btn buy-btn--now">立即购买</button>
       </div>
@@ -74,10 +88,12 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import ProductMedia from './components/ProductMedia.vue'
+import ProductSpec from './components/ProductSpec.vue'
 
 const mediaRef = ref(null)
+const specRef = ref(null)
 
 const productImages = ref([
   'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20wireless%20headphones%20on%20white%20background%20product%20photography&image_size=square_hd',
@@ -98,6 +114,64 @@ const product = ref({
   sales: '12.8万',
   rating: 4.9
 })
+
+const specGroups = ref([
+  {
+    key: 'color',
+    name: '颜色',
+    options: [
+      { id: 'color_black', name: '曜石黑', priceAdjust: 0, stock: 156 },
+      { id: 'color_white', name: '珍珠白', priceAdjust: 0, stock: 89 },
+      { id: 'color_silver', name: '星空银', priceAdjust: 50, stock: 42 },
+      { id: 'color_gold', name: '玫瑰金', priceAdjust: 50, stock: 0 }
+    ]
+  },
+  {
+    key: 'version',
+    name: '版本',
+    options: [
+      { id: 'version_standard', name: '标准版', priceAdjust: 0, stock: 200 },
+      { id: 'version_pro', name: 'Pro版', priceAdjust: 200, stock: 120 },
+      { id: 'version_ultra', name: 'Ultra版', priceAdjust: 400, stock: 58 }
+    ]
+  }
+])
+
+const skuList = ref([
+  { key: 'color_black-version_standard', priceAdjust: 0, stock: 156 },
+  { key: 'color_black-version_pro', priceAdjust: 200, stock: 80 },
+  { key: 'color_black-version_ultra', priceAdjust: 400, stock: 35 },
+  { key: 'color_white-version_standard', priceAdjust: 0, stock: 89 },
+  { key: 'color_white-version_pro', priceAdjust: 200, stock: 45 },
+  { key: 'color_white-version_ultra', priceAdjust: 400, stock: 20 },
+  { key: 'color_silver-version_standard', priceAdjust: 50, stock: 42 },
+  { key: 'color_silver-version_pro', priceAdjust: 250, stock: 28 },
+  { key: 'color_silver-version_ultra', priceAdjust: 450, stock: 12 },
+  { key: 'color_gold-version_standard', priceAdjust: 50, stock: 0 },
+  { key: 'color_gold-version_pro', priceAdjust: 250, stock: 0 },
+  { key: 'color_gold-version_ultra', priceAdjust: 450, stock: 0 }
+])
+
+const currentUnitPrice = ref(product.value.price)
+const currentTotalPrice = ref(product.value.price)
+
+const displayPrice = computed(() => {
+  return currentUnitPrice.value
+})
+
+const onSpecChange = (data) => {
+  console.log('规格变化:', data)
+}
+
+const onQuantityChange = (quantity) => {
+  console.log('数量变化:', quantity)
+}
+
+const onPriceChange = (data) => {
+  currentUnitPrice.value = data.unitPrice
+  currentTotalPrice.value = data.totalPrice
+  console.log('价格变化:', data)
+}
 
 const onVideoUploaded = (data) => {
   console.log('视频上传成功:', data)
@@ -263,7 +337,26 @@ const onVideoUploaded = (data) => {
 
 .bar-right {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.cart-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 4px;
+}
+
+.total-label {
+  font-size: 11px;
+  color: #999;
+}
+
+.total-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ff2442;
 }
 
 .buy-btn {
