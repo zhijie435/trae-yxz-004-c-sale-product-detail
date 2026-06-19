@@ -102,7 +102,7 @@ import ProductCoreInfo from './components/ProductCoreInfo.vue'
 import ServicePromises from './components/ServicePromises.vue'
 import ProductSpec from './components/ProductSpec.vue'
 import ProductDescription from './components/ProductDescription.vue'
-import { getProductDetail, getProductSales, createOrder, stripHtmlTags } from './api'
+import { getProductDetail, getProductSales, getSkuStock, createOrder, payOrder, stripHtmlTags } from './api'
 
 const PRODUCT_ID = 1001
 
@@ -204,24 +204,39 @@ const fetchSkuList = async () => {
   skuList.value = mockSkuList
 }
 
+const refreshStock = async () => {
+  if (!currentSkuKey.value) return
+  try {
+    const stockData = await getSkuStock(PRODUCT_ID, currentSkuKey.value)
+    const skuIndex = skuList.value.findIndex(s => s.key === currentSkuKey.value)
+    if (skuIndex !== -1) {
+      skuList.value[skuIndex].stock = stockData.stock
+      skuList.value[skuIndex].priceAdjust = stockData.priceAdjust
+    }
+  } catch (error) {
+    console.error('刷新库存失败:', error)
+  }
+}
+
 const handleBuyNow = async () => {
   if (ordering.value) return
   ordering.value = true
   try {
-    const result = await createOrder({
+    const orderResult = await createOrder({
       productId: PRODUCT_ID,
       skuKey: currentSkuKey.value,
       quantity: currentQuantity.value
     })
-    console.log('下单成功:', result)
-    alert(`下单成功！订单号：${result.orderId}\n合计：¥${result.totalPrice.toFixed(2)}`)
-    await fetchSalesInfo()
-    if (specRef.value) {
-      // 刷新库存
-    }
+    console.log('下单成功:', orderResult)
+
+    const payResult = await payOrder({ orderId: orderResult.orderId })
+    console.log('支付成功:', payResult)
+
+    alert(`支付成功！订单号：${payResult.orderId}\n合计：¥${payResult.totalPrice.toFixed(2)}`)
+    await Promise.all([fetchSalesInfo(), refreshStock()])
   } catch (error) {
-    console.error('下单失败:', error)
-    alert('下单失败：' + error.message)
+    console.error('操作失败:', error)
+    alert('操作失败：' + error.message)
   } finally {
     ordering.value = false
   }

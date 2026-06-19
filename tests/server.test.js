@@ -19,7 +19,7 @@ describe('Server - 销量格式化 formatSalesText', () => {
   })
 })
 
-describe('Server - 库存扣减 /api/order/create', () => {
+describe('Server - 订单创建 /api/order/create', () => {
   let initialState
 
   beforeEach(() => {
@@ -32,21 +32,24 @@ describe('Server - 库存扣减 /api/order/create', () => {
           { key: 'color_black-version_pro', priceAdjust: 200, stock: 50 },
           { key: 'color_silver-version_ultra', priceAdjust: 450, stock: 10 }
         ]
-      }
+      },
+      orders: new Map()
     })
   })
 
-  it('下单成功：正确扣减库存', async () => {
+  it('下单成功：创建订单但不扣减库存', async () => {
     const res = await request(app)
       .post('/api/order/create')
       .send({ productId: 1001, skuKey: 'color_black-version_standard', quantity: 3 })
 
     expect(res.statusCode).toBe(200)
     expect(res.body.code).toBe(0)
+    expect(res.body.data.status).toBe('pending')
 
     const state = getAppState()
     const sku = state.mockProduct.skuList.find(s => s.key === 'color_black-version_standard')
-    expect(sku.stock).toBe(97)
+    expect(sku.stock).toBe(100)
+    expect(state.orders.has(res.body.data.orderId)).toBe(true)
   })
 
   it('下单成功：返回正确的订单信息（单价、总价）', async () => {
@@ -60,6 +63,7 @@ describe('Server - 库存扣减 /api/order/create', () => {
     expect(res.body.data.totalPrice).toBe(2198)
     expect(res.body.data.quantity).toBe(2)
     expect(res.body.data.orderId).toMatch(/^ORD/)
+    expect(res.body.data.status).toBe('pending')
   })
 
   it('库存不足时返回错误', async () => {
@@ -106,6 +110,133 @@ describe('Server - 库存扣减 /api/order/create', () => {
   })
 })
 
+describe('Server - 订单支付 /api/order/pay', () => {
+  let initialState
+
+  beforeEach(() => {
+    initialState = cloneDeep(getAppState())
+    setAppState({
+      salesCount: 128000,
+      mockProduct: {
+        skuList: [
+          { key: 'color_black-version_standard', priceAdjust: 0, stock: 100 },
+          { key: 'color_black-version_pro', priceAdjust: 200, stock: 50 },
+          { key: 'color_silver-version_ultra', priceAdjust: 450, stock: 10 }
+        ]
+      },
+      orders: new Map()
+    })
+  })
+
+  it('支付成功：扣减库存', async () => {
+    const orderRes = await request(app)
+      .post('/api/order/create')
+      .send({ productId: 1001, skuKey: 'color_black-version_standard', quantity: 3 })
+
+    const payRes = await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: orderRes.body.data.orderId })
+
+    expect(payRes.statusCode).toBe(200)
+    expect(payRes.body.code).toBe(0)
+    expect(payRes.body.data.status).toBe('paid')
+
+    const state = getAppState()
+    const sku = state.mockProduct.skuList.find(s => s.key === 'color_black-version_standard')
+    expect(sku.stock).toBe(97)
+  })
+
+  it('支付成功：增加已售数量', async () => {
+    const initialSales = getAppState().salesCount
+
+    const orderRes = await request(app)
+      .post('/api/order/create')
+      .send({ productId: 1001, skuKey: 'color_black-version_standard', quantity: 5 })
+
+    await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: orderRes.body.data.orderId })
+
+    const state = getAppState()
+    expect(state.salesCount).toBe(initialSales + 5)
+  })
+
+  it('订单不存在时返回 404', async () => {
+    const res = await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: 'ORD_NOT_EXIST' })
+
+    expect(res.statusCode).toBe(404)
+    expect(res.body.code).toBe(1)
+    expect(res.body.message).toBe('订单不存在')
+  })
+
+  it('订单已支付时返回错误', async () => {
+    const orderRes = await request(app)
+      .post('/api/order/create')
+      .send({ productId: 1001, skuKey: 'color_black-version_standard', quantity: 1 })
+
+    await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: orderRes.body.data.orderId })
+
+    const res = await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: orderRes.body.data.orderId })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body.code).toBe(1)
+    expect(res.body.message).toBe('订单已支付')
+  })
+
+  it('支付时库存不足返回错误', async () => {
+    const orderRes = await request(app)
+      .post('/api/order/create')
+      .send({ productId: 1001, skuKey: 'color_silver-version_ultra', quantity: 5 })
+
+    const state = getAppState()
+    const sku = state.mockProduct.skuList.find(s => s.key === 'color_silver-version_ultra')
+    sku.stock = 3
+
+    const res = await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: orderRes.body.data.orderId })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body.code).toBe(1)
+    expect(res.body.message).toBe('库存不足')
+
+    const stateAfter = getAppState()
+    const skuAfter = stateAfter.mockProduct.skuList.find(s => s.key === 'color_silver-version_ultra')
+    expect(skuAfter.stock).toBe(3)
+  })
+
+  it('参数不完整时返回 400', async () => {
+    const res = await request(app)
+      .post('/api/order/pay')
+      .send({})
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body.code).toBe(1)
+    expect(res.body.message).toBe('参数不完整')
+  })
+
+  it('支付后订单包含 payTime', async () => {
+    const orderRes = await request(app)
+      .post('/api/order/create')
+      .send({ productId: 1001, skuKey: 'color_black-version_standard', quantity: 1 })
+
+    expect(orderRes.body.data.payTime).toBeNull()
+
+    const payRes = await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: orderRes.body.data.orderId })
+
+    expect(payRes.body.data.payTime).not.toBeNull()
+    expect(typeof payRes.body.data.payTime).toBe('string')
+  })
+})
+
 describe('Server - 已售数量 /api/product/:id/sales', () => {
   let initialState
 
@@ -122,14 +253,15 @@ describe('Server - 已售数量 /api/product/:id/sales', () => {
     expect(res.body.data.salesText).toBe('12.8万')
   })
 
-  it('下单后销量累加', async () => {
+  it('创建订单后销量不累加（仅支付后累加）', async () => {
     setAppState({
       salesCount: 128000,
       mockProduct: {
         skuList: [
           { key: 'color_black-version_standard', priceAdjust: 0, stock: 100 }
         ]
-      }
+      },
+      orders: new Map()
     })
 
     await request(app)
@@ -137,11 +269,34 @@ describe('Server - 已售数量 /api/product/:id/sales', () => {
       .send({ productId: 1001, skuKey: 'color_black-version_standard', quantity: 5 })
 
     const res = await request(app).get('/api/product/1001/sales')
+    expect(res.body.data.sales).toBe(128000)
+  })
+
+  it('支付后销量累加', async () => {
+    setAppState({
+      salesCount: 128000,
+      mockProduct: {
+        skuList: [
+          { key: 'color_black-version_standard', priceAdjust: 0, stock: 100 }
+        ]
+      },
+      orders: new Map()
+    })
+
+    const orderRes = await request(app)
+      .post('/api/order/create')
+      .send({ productId: 1001, skuKey: 'color_black-version_standard', quantity: 5 })
+
+    await request(app)
+      .post('/api/order/pay')
+      .send({ orderId: orderRes.body.data.orderId })
+
+    const res = await request(app).get('/api/product/1001/sales')
     expect(res.body.data.sales).toBe(128005)
     expect(res.body.data.salesText).toBe('12.8万')
   })
 
-  it('多次下单销量累加正确', async () => {
+  it('多次支付销量累加正确', async () => {
     setAppState({
       salesCount: 0,
       mockProduct: {
@@ -149,16 +304,40 @@ describe('Server - 已售数量 /api/product/:id/sales', () => {
           { key: 'sku_a', priceAdjust: 0, stock: 100 },
           { key: 'sku_b', priceAdjust: 0, stock: 100 }
         ]
-      }
+      },
+      orders: new Map()
     })
 
-    await request(app).post('/api/order/create').send({ productId: 1001, skuKey: 'sku_a', quantity: 3 })
-    await request(app).post('/api/order/create').send({ productId: 1001, skuKey: 'sku_b', quantity: 7 })
-    await request(app).post('/api/order/create').send({ productId: 1001, skuKey: 'sku_a', quantity: 10 })
+    const order1 = await request(app).post('/api/order/create').send({ productId: 1001, skuKey: 'sku_a', quantity: 3 })
+    await request(app).post('/api/order/pay').send({ orderId: order1.body.data.orderId })
+
+    const order2 = await request(app).post('/api/order/create').send({ productId: 1001, skuKey: 'sku_b', quantity: 7 })
+    await request(app).post('/api/order/pay').send({ orderId: order2.body.data.orderId })
+
+    const order3 = await request(app).post('/api/order/create').send({ productId: 1001, skuKey: 'sku_a', quantity: 10 })
+    await request(app).post('/api/order/pay').send({ orderId: order3.body.data.orderId })
 
     const res = await request(app).get('/api/product/1001/sales')
     expect(res.body.data.sales).toBe(20)
     expect(res.body.data.salesText).toBe('20')
+  })
+
+  it('未支付的订单不累加销量', async () => {
+    setAppState({
+      salesCount: 100,
+      mockProduct: {
+        skuList: [
+          { key: 'sku_a', priceAdjust: 0, stock: 100 }
+        ]
+      },
+      orders: new Map()
+    })
+
+    await request(app).post('/api/order/create').send({ productId: 1001, skuKey: 'sku_a', quantity: 5 })
+
+    const res = await request(app).get('/api/product/1001/sales')
+    expect(res.body.data.sales).toBe(100)
+    expect(res.body.data.salesText).toBe('100')
   })
 
   it('销量小于 10000 时不使用万单位', async () => {

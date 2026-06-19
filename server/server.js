@@ -211,6 +211,8 @@ const mockProduct = {
 
 let salesCount = mockProduct.sales
 
+const orders = new Map()
+
 app.get('/api/health', (req, res) => {
   res.json({ code: 0, message: '服务运行正常' })
 })
@@ -295,23 +297,56 @@ app.post('/api/order/create', (req, res) => {
   if (sku.stock < quantity) {
     return res.status(400).json({ code: 1, message: '库存不足' })
   }
-  sku.stock -= quantity
-  salesCount += quantity
   const orderId = 'ORD' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase()
   const unitPrice = mockProduct.price + sku.priceAdjust
   const totalPrice = unitPrice * quantity
+  const order = {
+    orderId,
+    productId,
+    skuKey,
+    quantity,
+    unitPrice,
+    totalPrice,
+    status: 'pending',
+    createTime: new Date().toISOString(),
+    payTime: null
+  }
+  orders.set(orderId, order)
   res.json({
     code: 0,
     message: '下单成功',
-    data: {
-      orderId,
-      productId,
-      skuKey,
-      quantity,
-      unitPrice,
-      totalPrice,
-      createTime: new Date().toISOString()
-    }
+    data: order
+  })
+})
+
+app.post('/api/order/pay', (req, res) => {
+  const { orderId } = req.body
+  if (!orderId) {
+    return res.status(400).json({ code: 1, message: '参数不完整' })
+  }
+  const order = orders.get(orderId)
+  if (!order) {
+    return res.status(404).json({ code: 1, message: '订单不存在' })
+  }
+  if (order.status === 'paid') {
+    return res.status(400).json({ code: 1, message: '订单已支付' })
+  }
+  const sku = mockProduct.skuList.find(s => s.key === order.skuKey)
+  if (!sku) {
+    return res.status(404).json({ code: 1, message: 'SKU不存在' })
+  }
+  if (sku.stock < order.quantity) {
+    return res.status(400).json({ code: 1, message: '库存不足' })
+  }
+  sku.stock -= order.quantity
+  salesCount += order.quantity
+  order.status = 'paid'
+  order.payTime = new Date().toISOString()
+  orders.set(orderId, order)
+  res.json({
+    code: 0,
+    message: '支付成功',
+    data: order
   })
 })
 
@@ -330,7 +365,8 @@ app.use((err, req, res, next) => {
 
 export const getAppState = () => ({
   mockProduct,
-  salesCount
+  salesCount,
+  orders
 })
 
 export const setAppState = (state) => {
@@ -340,6 +376,12 @@ export const setAppState = (state) => {
   }
   if (state.salesCount !== undefined) {
     salesCount = state.salesCount
+  }
+  if (state.orders !== undefined) {
+    orders.clear()
+    if (state.orders instanceof Map) {
+      state.orders.forEach((order, orderId) => orders.set(orderId, order))
+    }
   }
 }
 
