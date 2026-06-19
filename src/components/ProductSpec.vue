@@ -89,15 +89,15 @@ const selectedSpecs = ref({})
 const quantity = ref(1)
 
 const initDefaultSpecs = () => {
+  const newSpecs = { ...selectedSpecs.value }
   props.specGroups.forEach(group => {
     const availableOption = group.options.find(opt => opt.stock > 0)
     if (availableOption) {
-      selectedSpecs.value[group.key] = availableOption.id
+      newSpecs[group.key] = availableOption.id
     }
   })
+  selectedSpecs.value = newSpecs
 }
-
-initDefaultSpecs()
 
 const isSelected = (groupKey, optionId) => {
   return selectedSpecs.value[groupKey] === optionId
@@ -105,7 +105,10 @@ const isSelected = (groupKey, optionId) => {
 
 const selectSpec = (groupKey, option) => {
   if (option.stock === 0) return
-  selectedSpecs.value[groupKey] = option.id
+  selectedSpecs.value = {
+    ...selectedSpecs.value,
+    [groupKey]: option.id
+  }
 }
 
 const selectedSpecText = computed(() => {
@@ -217,6 +220,8 @@ watch(quantity, () => {
     specPriceAdjust: specPriceAdjust.value
   })
 })
+
+initDefaultSpecs()
 
 defineExpose({
   selectedSpecs,
