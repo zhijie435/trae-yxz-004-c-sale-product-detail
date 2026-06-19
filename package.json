@@ -8,7 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "install:all": "npm install && cd server && npm install",
+    "test:all": "vitest run",
+    "test:server": "vitest run tests/server.test.js",
+    "test:description": "vitest run tests/description.test.js",
+    "test:spec": "vitest run tests/useProductSpec.test.js",
+    "dev:server": "cd server && npm start",
+    "dev:all": "npm run dev:server & npm run dev",
+    "seed:info": "cd server && node -e \"import('./seedData.js').then(m => { const s = m.getInventorySummary(); console.log('=== 商品种子数据 ==='); console.log('商品ID:', m.seedProduct.id); console.log('商品名称:', m.seedProduct.title); console.log('基础价格: ¥' + m.seedProduct.price); console.log('初始销量:', m.seedProduct.sales); console.log('SKU总数:', s.totalSkus); console.log('在售SKU:', s.inStockSkus); console.log('缺货SKU:', s.outOfStockSkus); console.log('总库存:', s.totalStock + '件'); console.log('=================='); })\""
   },
   "dependencies": {
     "vue": "^3.4.21"
