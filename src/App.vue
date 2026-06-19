@@ -27,20 +27,18 @@
       @video-uploaded="onVideoUploaded"
     />
 
-    <section class="product-info">
-      <div class="price-row">
-        <span class="current-price">¥{{ displayPrice.toFixed(2) }}</span>
-        <span class="original-price" v-if="product.originalPrice">¥{{ product.originalPrice.toFixed(2) }}</span>
-        <span class="discount-tag" v-if="product.discount">{{ product.discount }}</span>
-      </div>
-      <h2 class="product-title">{{ product.title }}</h2>
-      <p class="product-subtitle">{{ product.subtitle }}</p>
-      <div class="product-meta">
-        <span class="sales">已售 {{ salesInfo.salesText }}</span>
-        <span class="divider">·</span>
-        <span class="rating">{{ product.rating }} 分</span>
-      </div>
-    </section>
+    <ProductCoreInfo
+      :title="product.title"
+      :subtitle="product.subtitle"
+      :brand="product.brand"
+      :model="product.model"
+      :parameters="product.parameters"
+      :display-price="displayPrice"
+      :original-price="product.originalPrice"
+      :discount="product.discount"
+      :sales-text="salesInfo.salesText"
+      :rating="product.rating"
+    />
 
     <ProductSpec
       v-if="dataLoaded"
@@ -98,6 +96,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import ProductMedia from './components/ProductMedia.vue'
+import ProductCoreInfo from './components/ProductCoreInfo.vue'
 import ProductSpec from './components/ProductSpec.vue'
 import ProductDescription from './components/ProductDescription.vue'
 import { getProductDetail, getProductSales, createOrder, stripHtmlTags } from './api'
@@ -118,6 +117,9 @@ const product = ref({
   discount: '',
   title: '',
   subtitle: '',
+  brand: '',
+  model: '',
+  parameters: [],
   rating: 0,
   images: [],
   video: '',
@@ -152,6 +154,9 @@ const fetchProductDetail = async () => {
       discount: data.discount,
       title: data.title,
       subtitle: data.subtitle,
+      brand: data.brand,
+      model: data.model,
+      parameters: data.parameters || [],
       rating: data.rating,
       images: data.images,
       video: data.video,
@@ -308,70 +313,6 @@ onMounted(async () => {
   font-size: 16px;
   font-weight: 600;
   color: #333;
-}
-
-.product-info {
-  padding: 16px;
-}
-
-.price-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.current-price {
-  font-size: 28px;
-  font-weight: 700;
-  color: #ff2442;
-}
-
-.original-price {
-  font-size: 14px;
-  color: #999;
-  text-decoration: line-through;
-}
-
-.discount-tag {
-  display: inline-block;
-  padding: 2px 8px;
-  background: linear-gradient(135deg, #ff6b6b, #ff2442);
-  color: #fff;
-  font-size: 12px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.product-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1a1a1a;
-  line-height: 1.4;
-  margin-bottom: 6px;
-}
-
-.product-subtitle {
-  font-size: 13px;
-  color: #666;
-  line-height: 1.6;
-  margin-bottom: 12px;
-}
-
-.product-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #999;
-}
-
-.divider {
-  color: #ddd;
-}
-
-.rating {
-  color: #ff9500;
 }
 
 .buy-bar {
