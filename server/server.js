@@ -83,6 +83,11 @@ const mockProduct = {
     { key: '续航时间', value: '40小时' },
     { key: '充电接口', value: 'Type-C' }
   ],
+  servicePromises: [
+    { icon: 'delivery', label: '配送方式', value: '快递发货' },
+    { icon: 'warranty', label: '质保', value: '全国联保' },
+    { icon: 'location', label: '可交付区域', value: '全国' }
+  ],
   price: 899,
   originalPrice: 1299,
   discount: '限时6.9折',
@@ -168,6 +173,7 @@ app.get('/api/product/:id', (req, res) => {
       brand: mockProduct.brand,
       model: mockProduct.model,
       parameters: mockProduct.parameters,
+      servicePromises: mockProduct.servicePromises,
       price: mockProduct.price,
       originalPrice: mockProduct.originalPrice,
       discount: mockProduct.discount,

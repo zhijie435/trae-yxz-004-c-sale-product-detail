@@ -40,6 +40,8 @@
       :rating="product.rating"
     />
 
+    <ServicePromises :promises="product.servicePromises" />
+
     <ProductSpec
       v-if="dataLoaded"
       ref="specRef"
@@ -97,6 +99,7 @@
 import { ref, computed, onMounted } from 'vue'
 import ProductMedia from './components/ProductMedia.vue'
 import ProductCoreInfo from './components/ProductCoreInfo.vue'
+import ServicePromises from './components/ServicePromises.vue'
 import ProductSpec from './components/ProductSpec.vue'
 import ProductDescription from './components/ProductDescription.vue'
 import { getProductDetail, getProductSales, createOrder, stripHtmlTags } from './api'
@@ -120,6 +123,7 @@ const product = ref({
   brand: '',
   model: '',
   parameters: [],
+  servicePromises: [],
   rating: 0,
   images: [],
   video: '',
@@ -157,6 +161,7 @@ const fetchProductDetail = async () => {
       brand: data.brand,
       model: data.model,
       parameters: data.parameters || [],
+      servicePromises: data.servicePromises || [],
       rating: data.rating,
       images: data.images,
       video: data.video,
