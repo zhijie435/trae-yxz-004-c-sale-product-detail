@@ -18,7 +18,7 @@
               'is-disabled': option.stock === 0
             }"
             :disabled="option.stock === 0"
-            @click="selectSpec(group.key, option)"
+            @click="handleSelectSpec(group.key, option)"
           >
             <span class="option-name">{{ option.name }}</span>
             <span class="option-price" v-if="option.priceAdjust !== 0">
@@ -66,7 +66,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed, toRef, watch } from 'vue'
+import { useProductSpec } from '../composables/useProductSpec'
 
 const props = defineProps({
   basePrice: {
@@ -80,130 +81,52 @@ const props = defineProps({
   skuList: {
     type: Array,
     default: () => []
+  },
+  productId: {
+    type: [Number, String],
+    default: 1001
   }
 })
 
 const emit = defineEmits(['spec-change', 'quantity-change', 'price-change'])
 
-const selectedSpecs = ref({})
-const quantity = ref(1)
+const basePriceRef = toRef(props, 'basePrice')
+const specGroupsRef = toRef(props, 'specGroups')
+const skuListRef = toRef(props, 'skuList')
 
-const initDefaultSpecs = () => {
-  const newSpecs = { ...selectedSpecs.value }
-  props.specGroups.forEach(group => {
-    const availableOption = group.options.find(opt => opt.stock > 0)
-    if (availableOption) {
-      newSpecs[group.key] = availableOption.id
-    }
-  })
-  selectedSpecs.value = newSpecs
-}
+const {
+  selectedSpecs,
+  quantity,
+  loading,
+  selectedSpecText,
+  skuKey,
+  matchedSku,
+  specPriceAdjust,
+  unitPrice,
+  currentStock,
+  maxQuantity,
+  totalPrice,
+  initDefaultSpecs,
+  isSelected,
+  selectSpec,
+  decreaseQty,
+  increaseQty,
+  onQuantityChange
+} = useProductSpec(basePriceRef, specGroupsRef, skuListRef, {
+  productId: props.productId,
+  enableServerSync: false
+})
 
-const isSelected = (groupKey, optionId) => {
-  return selectedSpecs.value[groupKey] === optionId
-}
-
-const selectSpec = (groupKey, option) => {
+const handleSelectSpec = (groupKey, option) => {
   if (option.stock === 0) return
-  selectedSpecs.value = {
-    ...selectedSpecs.value,
-    [groupKey]: option.id
-  }
-}
-
-const selectedSpecText = computed(() => {
-  const texts = []
-  props.specGroups.forEach(group => {
-    const selectedId = selectedSpecs.value[group.key]
-    const option = group.options.find(opt => opt.id === selectedId)
-    if (option) {
-      texts.push(option.name)
-    }
-  })
-  return texts.length > 0 ? texts.join('，') : '请选择规格'
-})
-
-const specPriceAdjust = computed(() => {
-  let adjust = 0
-  props.specGroups.forEach(group => {
-    const selectedId = selectedSpecs.value[group.key]
-    const option = group.options.find(opt => opt.id === selectedId)
-    if (option) {
-      adjust += option.priceAdjust || 0
-    }
-  })
-  
-  if (props.skuList.length > 0) {
-    const skuKey = Object.values(selectedSpecs.value).join('-')
-    const matchedSku = props.skuList.find(sku => sku.key === skuKey)
-    if (matchedSku && matchedSku.priceAdjust !== undefined) {
-      adjust = matchedSku.priceAdjust
-    }
-  }
-  
-  return adjust
-})
-
-const unitPrice = computed(() => {
-  return props.basePrice + specPriceAdjust.value
-})
-
-const currentStock = computed(() => {
-  if (props.skuList.length > 0) {
-    const skuKey = Object.values(selectedSpecs.value).join('-')
-    const matchedSku = props.skuList.find(sku => sku.key === skuKey)
-    if (matchedSku) {
-      return matchedSku.stock
-    }
-  }
-  
-  let minStock = Infinity
-  props.specGroups.forEach(group => {
-    const selectedId = selectedSpecs.value[group.key]
-    const option = group.options.find(opt => opt.id === selectedId)
-    if (option && option.stock !== undefined) {
-      minStock = Math.min(minStock, option.stock)
-    }
-  })
-  
-  return minStock === Infinity ? 999 : minStock
-})
-
-const maxQuantity = computed(() => {
-  return Math.max(1, currentStock.value)
-})
-
-const totalPrice = computed(() => {
-  return unitPrice.value * quantity.value
-})
-
-const decreaseQty = () => {
-  if (quantity.value > 1) {
-    quantity.value--
-  }
-}
-
-const increaseQty = () => {
-  if (quantity.value < maxQuantity.value) {
-    quantity.value++
-  }
-}
-
-const onQuantityChange = () => {
-  if (quantity.value < 1) {
-    quantity.value = 1
-  } else if (quantity.value > maxQuantity.value) {
-    quantity.value = maxQuantity.value
-  }
+  selectSpec(groupKey, option.id)
 }
 
 watch(selectedSpecs, () => {
-  if (quantity.value > currentStock.value) {
-    quantity.value = currentStock.value
-  }
   emit('spec-change', {
     specs: { ...selectedSpecs.value },
-    specText: selectedSpecText.value
+    specText: selectedSpecText.value,
+    skuKey: skuKey.value
   })
   emit('price-change', {
     unitPrice: unitPrice.value,
@@ -228,7 +151,9 @@ defineExpose({
   quantity,
   unitPrice,
   totalPrice,
-  currentStock
+  currentStock,
+  skuKey,
+  selectedSpecText
 })
 </script>
 

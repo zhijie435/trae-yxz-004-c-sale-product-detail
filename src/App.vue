@@ -22,8 +22,8 @@
 
     <ProductMedia
       ref="mediaRef"
-      :initial-images="productImages"
-      :initial-video-url="productVideo"
+      :initial-images="product.images"
+      :initial-video-url="product.video"
       @video-uploaded="onVideoUploaded"
     />
 
@@ -36,14 +36,16 @@
       <h2 class="product-title">{{ product.title }}</h2>
       <p class="product-subtitle">{{ product.subtitle }}</p>
       <div class="product-meta">
-        <span class="sales">已售 {{ product.sales }}</span>
+        <span class="sales">已售 {{ salesInfo.salesText }}</span>
         <span class="divider">·</span>
         <span class="rating">{{ product.rating }} 分</span>
       </div>
     </section>
 
     <ProductSpec
+      v-if="dataLoaded"
       ref="specRef"
+      :product-id="product.id"
       :base-price="product.price"
       :spec-groups="specGroups"
       :sku-list="skuList"
@@ -80,90 +82,147 @@
           <span class="total-label">合计</span>
           <span class="total-amount">¥{{ currentTotalPrice.toFixed(2) }}</span>
         </div>
-        <button class="buy-btn buy-btn--cart">加入购物车</button>
-        <button class="buy-btn buy-btn--now">立即购买</button>
+        <button class="buy-btn buy-btn--cart" @click="handleAddToCart">加入购物车</button>
+        <button class="buy-btn buy-btn--now" :disabled="ordering" @click="handleBuyNow">{{ ordering ? '下单中...' : '立即购买' }}</button>
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import ProductMedia from './components/ProductMedia.vue'
 import ProductSpec from './components/ProductSpec.vue'
+import { getProductDetail, getProductSales, createOrder } from './api'
+
+const PRODUCT_ID = 1001
 
 const mediaRef = ref(null)
 const specRef = ref(null)
 
-const productImages = ref([
-  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20wireless%20headphones%20on%20white%20background%20product%20photography&image_size=square_hd',
-  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=wireless%20headphones%20detail%20shot%20ear%20cups%20close%20up%20product%20photo&image_size=square_hd',
-  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=wireless%20bluetooth%20headphones%20side%20view%20lifestyle%20product%20shot&image_size=square_hd',
-  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20headphones%20packaging%20box%20unboxing%20product%20photography&image_size=square_hd',
-  'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=headphones%20charging%20case%20accessories%20flat%20lay%20product%20photo&image_size=square_hd'
-])
-
-const productVideo = ref('')
+const loading = ref(false)
+const ordering = ref(false)
+const dataLoaded = ref(false)
 
 const product = ref({
-  price: 899,
-  originalPrice: 1299,
-  discount: '限时6.9折',
-  title: '【全新旗舰】主动降噪无线蓝牙耳机 头戴式',
-  subtitle: '40dB主动降噪 | 40小时超长续航 | Hi-Res金标认证 | 蓝牙5.3',
-  sales: '12.8万',
-  rating: 4.9
+  id: PRODUCT_ID,
+  price: 0,
+  originalPrice: 0,
+  discount: '',
+  title: '',
+  subtitle: '',
+  rating: 0,
+  images: [],
+  video: ''
 })
 
-const specGroups = ref([
-  {
-    key: 'color',
-    name: '颜色',
-    options: [
-      { id: 'color_black', name: '曜石黑', priceAdjust: 0, stock: 156 },
-      { id: 'color_white', name: '珍珠白', priceAdjust: 0, stock: 89 },
-      { id: 'color_silver', name: '星空银', priceAdjust: 50, stock: 42 },
-      { id: 'color_gold', name: '玫瑰金', priceAdjust: 50, stock: 0 }
-    ]
-  },
-  {
-    key: 'version',
-    name: '版本',
-    options: [
-      { id: 'version_standard', name: '标准版', priceAdjust: 0, stock: 200 },
-      { id: 'version_pro', name: 'Pro版', priceAdjust: 200, stock: 120 },
-      { id: 'version_ultra', name: 'Ultra版', priceAdjust: 400, stock: 58 }
-    ]
-  }
-])
+const salesInfo = ref({
+  sales: 0,
+  salesText: ''
+})
 
-const skuList = ref([
-  { key: 'color_black-version_standard', priceAdjust: 0, stock: 156 },
-  { key: 'color_black-version_pro', priceAdjust: 200, stock: 80 },
-  { key: 'color_black-version_ultra', priceAdjust: 400, stock: 35 },
-  { key: 'color_white-version_standard', priceAdjust: 0, stock: 89 },
-  { key: 'color_white-version_pro', priceAdjust: 200, stock: 45 },
-  { key: 'color_white-version_ultra', priceAdjust: 400, stock: 20 },
-  { key: 'color_silver-version_standard', priceAdjust: 50, stock: 42 },
-  { key: 'color_silver-version_pro', priceAdjust: 250, stock: 28 },
-  { key: 'color_silver-version_ultra', priceAdjust: 450, stock: 12 },
-  { key: 'color_gold-version_standard', priceAdjust: 50, stock: 0 },
-  { key: 'color_gold-version_pro', priceAdjust: 250, stock: 0 },
-  { key: 'color_gold-version_ultra', priceAdjust: 450, stock: 0 }
-])
+const specGroups = ref([])
+const skuList = ref([])
 
-const currentUnitPrice = ref(product.value.price)
-const currentTotalPrice = ref(product.value.price)
+const currentUnitPrice = ref(0)
+const currentTotalPrice = ref(0)
+const currentSkuKey = ref('')
+const currentQuantity = ref(1)
 
 const displayPrice = computed(() => {
-  return currentUnitPrice.value
+  return currentUnitPrice.value || product.value.price
 })
 
+const fetchProductDetail = async () => {
+  loading.value = true
+  try {
+    const data = await getProductDetail(PRODUCT_ID)
+    product.value = {
+      id: data.id,
+      price: data.price,
+      originalPrice: data.originalPrice,
+      discount: data.discount,
+      title: data.title,
+      subtitle: data.subtitle,
+      rating: data.rating,
+      images: data.images,
+      video: data.video
+    }
+    specGroups.value = data.specGroups
+    currentUnitPrice.value = data.price
+    currentTotalPrice.value = data.price
+  } catch (error) {
+    console.error('获取商品详情失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchSalesInfo = async () => {
+  try {
+    const data = await getProductSales(PRODUCT_ID)
+    salesInfo.value = data
+  } catch (error) {
+    console.error('获取销量信息失败:', error)
+  }
+}
+
+const fetchSkuList = async () => {
+  const mockSkuList = [
+    { key: 'color_black-version_standard', priceAdjust: 0, stock: 156 },
+    { key: 'color_black-version_pro', priceAdjust: 200, stock: 80 },
+    { key: 'color_black-version_ultra', priceAdjust: 400, stock: 35 },
+    { key: 'color_white-version_standard', priceAdjust: 0, stock: 89 },
+    { key: 'color_white-version_pro', priceAdjust: 200, stock: 45 },
+    { key: 'color_white-version_ultra', priceAdjust: 400, stock: 20 },
+    { key: 'color_silver-version_standard', priceAdjust: 50, stock: 42 },
+    { key: 'color_silver-version_pro', priceAdjust: 250, stock: 28 },
+    { key: 'color_silver-version_ultra', priceAdjust: 450, stock: 12 },
+    { key: 'color_gold-version_standard', priceAdjust: 50, stock: 0 },
+    { key: 'color_gold-version_pro', priceAdjust: 250, stock: 0 },
+    { key: 'color_gold-version_ultra', priceAdjust: 450, stock: 0 }
+  ]
+  skuList.value = mockSkuList
+}
+
+const handleBuyNow = async () => {
+  if (ordering.value) return
+  ordering.value = true
+  try {
+    const result = await createOrder({
+      productId: PRODUCT_ID,
+      skuKey: currentSkuKey.value,
+      quantity: currentQuantity.value
+    })
+    console.log('下单成功:', result)
+    alert(`下单成功！订单号：${result.orderId}\n合计：¥${result.totalPrice.toFixed(2)}`)
+    await fetchSalesInfo()
+    if (specRef.value) {
+      // 刷新库存
+    }
+  } catch (error) {
+    console.error('下单失败:', error)
+    alert('下单失败：' + error.message)
+  } finally {
+    ordering.value = false
+  }
+}
+
+const handleAddToCart = () => {
+  console.log('加入购物车:', {
+    skuKey: currentSkuKey.value,
+    quantity: currentQuantity.value
+  })
+  alert('已加入购物车')
+}
+
 const onSpecChange = (data) => {
+  currentSkuKey.value = data.skuKey
   console.log('规格变化:', data)
 }
 
 const onQuantityChange = (quantity) => {
+  currentQuantity.value = quantity
   console.log('数量变化:', quantity)
 }
 
@@ -176,6 +235,20 @@ const onPriceChange = (data) => {
 const onVideoUploaded = (data) => {
   console.log('视频上传成功:', data)
 }
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    await Promise.all([
+      fetchProductDetail(),
+      fetchSalesInfo(),
+      fetchSkuList()
+    ])
+    dataLoaded.value = true
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <style scoped>

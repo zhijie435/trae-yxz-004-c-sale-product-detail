@@ -69,8 +69,147 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
   })
 })
 
+const mockProduct = {
+  id: 1001,
+  title: '【全新旗舰】主动降噪无线蓝牙耳机 头戴式',
+  subtitle: '40dB主动降噪 | 40小时超长续航 | Hi-Res金标认证 | 蓝牙5.3',
+  price: 899,
+  originalPrice: 1299,
+  discount: '限时6.9折',
+  sales: 128000,
+  rating: 4.9,
+  images: [
+    'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=elegant%20wireless%20headphones%20on%20white%20background%20product%20photography&image_size=square_hd',
+    'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=wireless%20headphones%20detail%20shot%20ear%20cups%20close%20up%20product%20photo&image_size=square_hd',
+    'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=wireless%20bluetooth%20headphones%20side%20view%20lifestyle%20product%20shot&image_size=square_hd',
+    'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=premium%20headphones%20packaging%20box%20unboxing%20product%20photography&image_size=square_hd',
+    'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=headphones%20charging%20case%20accessories%20flat%20lay%20product%20photo&image_size=square_hd'
+  ],
+  video: '',
+  specGroups: [
+    {
+      key: 'color',
+      name: '颜色',
+      options: [
+        { id: 'color_black', name: '曜石黑', priceAdjust: 0 },
+        { id: 'color_white', name: '珍珠白', priceAdjust: 0 },
+        { id: 'color_silver', name: '星空银', priceAdjust: 50 },
+        { id: 'color_gold', name: '玫瑰金', priceAdjust: 50 }
+      ]
+    },
+    {
+      key: 'version',
+      name: '版本',
+      options: [
+        { id: 'version_standard', name: '标准版', priceAdjust: 0 },
+        { id: 'version_pro', name: 'Pro版', priceAdjust: 200 },
+        { id: 'version_ultra', name: 'Ultra版', priceAdjust: 400 }
+      ]
+    }
+  ],
+  skuList: [
+    { key: 'color_black-version_standard', priceAdjust: 0, stock: 156 },
+    { key: 'color_black-version_pro', priceAdjust: 200, stock: 80 },
+    { key: 'color_black-version_ultra', priceAdjust: 400, stock: 35 },
+    { key: 'color_white-version_standard', priceAdjust: 0, stock: 89 },
+    { key: 'color_white-version_pro', priceAdjust: 200, stock: 45 },
+    { key: 'color_white-version_ultra', priceAdjust: 400, stock: 20 },
+    { key: 'color_silver-version_standard', priceAdjust: 50, stock: 42 },
+    { key: 'color_silver-version_pro', priceAdjust: 250, stock: 28 },
+    { key: 'color_silver-version_ultra', priceAdjust: 450, stock: 12 },
+    { key: 'color_gold-version_standard', priceAdjust: 50, stock: 0 },
+    { key: 'color_gold-version_pro', priceAdjust: 250, stock: 0 },
+    { key: 'color_gold-version_ultra', priceAdjust: 450, stock: 0 }
+  ]
+}
+
+let salesCount = mockProduct.sales
+
 app.get('/api/health', (req, res) => {
   res.json({ code: 0, message: '服务运行正常' })
+})
+
+app.get('/api/product/:id', (req, res) => {
+  const { id } = req.params
+  res.json({
+    code: 0,
+    message: 'success',
+    data: {
+      id: mockProduct.id,
+      title: mockProduct.title,
+      subtitle: mockProduct.subtitle,
+      price: mockProduct.price,
+      originalPrice: mockProduct.originalPrice,
+      discount: mockProduct.discount,
+      rating: mockProduct.rating,
+      images: mockProduct.images,
+      video: mockProduct.video,
+      specGroups: mockProduct.specGroups
+    }
+  })
+})
+
+app.get('/api/product/:id/sales', (req, res) => {
+  res.json({
+    code: 0,
+    message: 'success',
+    data: {
+      sales: salesCount,
+      salesText: salesCount >= 10000 ? (salesCount / 10000).toFixed(1) + '万' : salesCount.toString()
+    }
+  })
+})
+
+app.get('/api/product/:id/stock', (req, res) => {
+  const { skuKey } = req.query
+  if (!skuKey) {
+    return res.status(400).json({ code: 1, message: '缺少skuKey参数' })
+  }
+  const sku = mockProduct.skuList.find(s => s.key === skuKey)
+  if (!sku) {
+    return res.status(404).json({ code: 1, message: 'SKU不存在' })
+  }
+  res.json({
+    code: 0,
+    message: 'success',
+    data: {
+      skuKey: sku.key,
+      stock: sku.stock,
+      priceAdjust: sku.priceAdjust
+    }
+  })
+})
+
+app.post('/api/order/create', (req, res) => {
+  const { productId, skuKey, quantity } = req.body
+  if (!productId || !skuKey || !quantity) {
+    return res.status(400).json({ code: 1, message: '参数不完整' })
+  }
+  const sku = mockProduct.skuList.find(s => s.key === skuKey)
+  if (!sku) {
+    return res.status(404).json({ code: 1, message: 'SKU不存在' })
+  }
+  if (sku.stock < quantity) {
+    return res.status(400).json({ code: 1, message: '库存不足' })
+  }
+  sku.stock -= quantity
+  salesCount += quantity
+  const orderId = 'ORD' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase()
+  const unitPrice = mockProduct.price + sku.priceAdjust
+  const totalPrice = unitPrice * quantity
+  res.json({
+    code: 0,
+    message: '下单成功',
+    data: {
+      orderId,
+      productId,
+      skuKey,
+      quantity,
+      unitPrice,
+      totalPrice,
+      createTime: new Date().toISOString()
+    }
+  })
 })
 
 app.use((err, req, res, next) => {
