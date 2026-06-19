@@ -89,9 +89,21 @@
           <span class="total-amount">¥{{ currentTotalPrice.toFixed(2) }}</span>
         </div>
         <button class="buy-btn buy-btn--cart" @click="handleAddToCart">加入购物车</button>
-        <button class="buy-btn buy-btn--now" :disabled="ordering" @click="handleBuyNow">{{ ordering ? '下单中...' : '立即购买' }}</button>
+        <button class="buy-btn buy-btn--now" :disabled="ordering" @click="handleBuyNow">立即购买</button>
       </div>
     </footer>
+
+    <OrderConfirm
+      :visible="showOrderConfirm"
+      :product-image="product.images[0]"
+      :product-title="product.title"
+      :spec-text="selectedSpecText"
+      :unit-price="currentUnitPrice"
+      :quantity="currentQuantity"
+      :loading="paying"
+      @cancel="handleCancelOrder"
+      @confirm="handleConfirmPay"
+    />
   </div>
 </template>
 
@@ -102,6 +114,7 @@ import ProductCoreInfo from './components/ProductCoreInfo.vue'
 import ServicePromises from './components/ServicePromises.vue'
 import ProductSpec from './components/ProductSpec.vue'
 import ProductDescription from './components/ProductDescription.vue'
+import OrderConfirm from './components/OrderConfirm.vue'
 import { getProductDetail, getProductSales, getSkuStock, createOrder, payOrder, stripHtmlTags } from './api'
 
 const PRODUCT_ID = 1001
@@ -111,7 +124,10 @@ const specRef = ref(null)
 
 const loading = ref(false)
 const ordering = ref(false)
+const paying = ref(false)
 const dataLoaded = ref(false)
+const showOrderConfirm = ref(false)
+const selectedSpecText = ref('')
 
 const product = ref({
   id: PRODUCT_ID,
@@ -218,9 +234,21 @@ const refreshStock = async () => {
   }
 }
 
-const handleBuyNow = async () => {
-  if (ordering.value) return
-  ordering.value = true
+const handleBuyNow = () => {
+  if (!currentSkuKey.value) {
+    alert('请选择规格')
+    return
+  }
+  showOrderConfirm.value = true
+}
+
+const handleCancelOrder = () => {
+  showOrderConfirm.value = false
+}
+
+const handleConfirmPay = async () => {
+  if (paying.value) return
+  paying.value = true
   try {
     const orderResult = await createOrder({
       productId: PRODUCT_ID,
@@ -232,13 +260,14 @@ const handleBuyNow = async () => {
     const payResult = await payOrder({ orderId: orderResult.orderId })
     console.log('支付成功:', payResult)
 
+    showOrderConfirm.value = false
     alert(`支付成功！订单号：${payResult.orderId}\n合计：¥${payResult.totalPrice.toFixed(2)}`)
     await Promise.all([fetchSalesInfo(), refreshStock()])
   } catch (error) {
-    console.error('操作失败:', error)
-    alert('操作失败：' + error.message)
+    console.error('支付失败:', error)
+    alert('支付失败：' + error.message)
   } finally {
-    ordering.value = false
+    paying.value = false
   }
 }
 
@@ -252,6 +281,7 @@ const handleAddToCart = () => {
 
 const onSpecChange = (data) => {
   currentSkuKey.value = data.skuKey
+  selectedSpecText.value = data.specText
   console.log('规格变化:', data)
 }
 
